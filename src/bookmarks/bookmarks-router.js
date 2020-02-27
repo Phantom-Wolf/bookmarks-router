@@ -1,7 +1,7 @@
 // imports
 
 const express = require('express');
-const uuid = require('uuid/v4');
+const { v4: uuidv4 } = require('uuid');
 const { isWebUri } = require('valid-url');
 const logger = require('../logger');
 const { bookmarks } = require('../store');
@@ -48,9 +48,8 @@ bookmarkRouter
 				.send(`Rating must be a number between 0 and 5`);
 		}
 
-		const id = uuid();
 		const bookmark = {
-			id,
+			id: uuidv4(),
 			title,
 			url,
 			description,
@@ -59,9 +58,11 @@ bookmarkRouter
 
 		bookmarks.push(bookmark);
 
-		logger.info(`Bookmark with id ${id} created`);
+		logger.info(`Bookmark with id ${bookmark.id} created`);
 
-		res.status(201).location(`http://localhost:8000/bookmarks/${id}`);
+		res.status(201)
+			.location(`http://localhost:8000/bookmarks/${bookmark.id}`)
+			.json(bookmark);
 	});
 
 bookmarkRouter

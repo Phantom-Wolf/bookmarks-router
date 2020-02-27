@@ -12,12 +12,11 @@ const validateBearerToken = require('./validate-bearer-token');
 const app = express();
 
 // middleware
-
+app.use(validateBearerToken);
 const morganOption = NODE_ENV === 'production' ? 'tiny' : 'common';
 app.use(morgan(morganOption));
 app.use(cors());
 app.use(helmet());
-app.use(validateBearerToken);
 
 // body
 
