@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const { isWebUri } = require('valid-url');
 const logger = require('../logger');
 const { bookmarks } = require('../store');
-const BookmarksService = require('../src/bookmarks/bookmarks-service');
+const BookmarksService = require('./bookmarks-service');
 
 // middleware
 
@@ -86,7 +86,6 @@ bookmarkRouter
 			})
 			.catch(next);
 	})
-
 	.delete((req, res) => {
 		const { id } = req.params;
 		const bookmarkIndex = bookmarks.findIndex((b) => b.id == id);

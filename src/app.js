@@ -23,7 +23,7 @@ app.use(helmet());
 app.use(bookmarkRouter);
 
 app.get('/', (req, res) => {
-	res.send('Hello, world!');
+	res.send('Hello, boilerplate');
 });
 
 // error handling
