@@ -1,152 +1,119 @@
-const knex = require('knex');
-const fixtures = require('./bookmarks-fixtures');
-const app = require('../src/app');
-// TODO: remove when updating POST and DELETE
-const store = require('../src/store');
+// imports
 
-describe('Bookmarks Endpoints', () => {
+const knex = require("knex");
+const fixtures = require("./bookmarks-fixtures");
+const app = require("../src/app");
+// TODO: remove when updating POST and DELETE
+const store = require("../src/store");
+
+// test body
+
+describe("Bookmarks Endpoints", () => {
 	let bookmarksCopy, db;
 
-	before('make knex instance', () => {
+	before("make knex instance", () => {
 		db = knex({
-			client: 'pg',
+			client: "pg",
 			connection: process.env.TEST_DB_URL,
 		});
-		app.set('db', db);
+		app.set("db", db);
 	});
 
-	after('disconnect from db', () => db.destroy());
+	after("disconnect from db", () => db.destroy());
 
-	before('cleanup', () => db('bookmarks').truncate());
+	before("cleanup", () => db("bookmarks").truncate());
 
-	afterEach('cleanup', () => db('bookmarks').truncate());
+	afterEach("cleanup", () => db("bookmarks").truncate());
 
-	// TODO: refactor to use db when updating POST and DELETE
-	beforeEach('copy the bookmarks', () => {
-		// copy the bookmarks so we can restore them after testing
-		bookmarksCopy = store.bookmarks.slice();
-	});
+	// // TODO: refactor to use db when updating POST and DELETE
+	// beforeEach('copy the bookmarks', () => {
+	// 	// copy the bookmarks so we can restore them after testing
+	// 	bookmarksCopy = store.bookmarks.slice();
+	// });
 
-	// TODO: refactor to use db when updating POST and DELETE
-	afterEach('restore the bookmarks', () => {
-		// restore the bookmarks back to original
-		store.bookmarks = bookmarksCopy;
-	});
+	// // TODO: refactor to use db when updating POST and DELETE
+	// afterEach('restore the bookmarks', () => {
+	// 	// restore the bookmarks back to original
+	// 	store.bookmarks = bookmarksCopy;
+	// });
 
 	describe(`Unauthorized requests`, () => {
-		it(`responds with 401 Unauthorized for GET /bookmarks`, () => {
-			return supertest(app)
-				.get('/bookmarks')
-				.expect(401, {
-					error: 'Unauthorized request'
-				});
+		it(`responds with 401 Unauthorized for GET /api/bookmarks`, () => {
+			return supertest(app).get("/api/bookmarks").expect(401, {
+				error: "Unauthorized request",
+			});
 		});
 
-		it(`responds with 401 Unauthorized for POST /bookmarks`, () => {
+		it(`responds with 401 Unauthorized for POST /api/bookmarks`, () => {
 			return supertest(app)
-				.post('/bookmarks')
+				.post("/api/bookmarks")
 				.send({
-					title: 'test-title',
-					url: 'http://some.thing.com',
+					title: "test-title",
+					url: "http://some.thing.com",
 					rating: 1,
 				})
 				.expect(401, {
-					error: 'Unauthorized request'
+					error: "Unauthorized request",
 				});
 		});
 
-		it(`responds with 401 Unauthorized for GET /bookmarks/:id`, () => {
+		it(`responds with 401 Unauthorized for GET /api/bookmarks/:id`, () => {
 			const secondBookmark = store.bookmarks[1];
-			return supertest(app)
-				.get(`/bookmarks/${secondBookmark.id}`)
-				.expect(401, {
-					error: 'Unauthorized request'
-				});
+			return supertest(app).get(`/api/bookmarks/${secondBookmark.id}`).expect(401, {
+				error: "Unauthorized request",
+			});
 		});
 
-		it(`responds with 401 Unauthorized for DELETE /bookmarks/:id`, () => {
+		it(`responds with 401 Unauthorized for DELETE /api/bookmarks/:id`, () => {
 			const aBookmark = store.bookmarks[1];
-			return supertest(app)
-				.delete(`/bookmarks/${aBookmark.id}`)
-				.expect(401, {
-					error: 'Unauthorized request'
-				});
+			return supertest(app).delete(`/api/bookmarks/${aBookmark.id}`).expect(401, {
+				error: "Unauthorized request",
+			});
 		});
 	});
 
-	describe('GET /bookmarks', () => {
+	describe("GET /api/bookmarks", () => {
 		context(`Given no bookmarks`, () => {
 			it(`responds with 200 and an empty list`, () => {
 				return supertest(app)
-					.get('/bookmarks')
-					.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
+					.get("/api/bookmarks")
+					.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
 					.expect(200, []);
 			});
 		});
 
-		context('Given there are bookmarks in the database', () => {
+		context("Given there are bookmarks in the database", () => {
 			const testBookmarks = fixtures.makeBookmarksArray();
 
-			beforeEach('insert bookmarks', () => {
-				return db.into('bookmarks').insert(testBookmarks);
+			beforeEach("insert bookmarks", () => {
+				return db.into("bookmarks").insert(testBookmarks);
 			});
 
-			it('gets the bookmarks from the store', () => {
+			it("gets the bookmarks from the store", () => {
 				return supertest(app)
-					.get('/bookmarks')
-					.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
+					.get("/api/bookmarks")
+					.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
 					.expect(200, testBookmarks);
 			});
 		});
 	});
 
-	describe.only(`POST /bookmarks`, () => {
-		it(`creates a bookmark, responding with 201 and the new bookmark`, function () {
-			this.retries(3);
+	describe.only("POST /api/bookmarks", () => {
+		["title", "url", "rating", "description"].forEach((field) => {
 			const newBookmark = {
-				title: 'new title',
-				url: 'https://www.newaddress.com',
-				description: 'test new description',
-				rating: '5',
-			};
-			return supertest(app)
-				.post('/bookmarks')
-				.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-				.send(newBookmark)
-				.expect(201)
-				.expect((res) => {
-					expect(res.body.title).to.eql(newBookmark.title);
-					expect(res.body.url).to.eql(newBookmark.url);
-					expect(res.body.description).to.eql(newBookmark.description);
-					expect(res.body.rating).to.eql(newBookmark.rating);
-					expect(res.body).to.have.property('id');
-					expect(res.headers.location).to.eql(`/bookmarks/${res.body.id}`);
-				})
-				.then((res) =>
-					supertest(app)
-					.get(`/bookmarks/${res.body.id}`)
-					.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-					.expect(res.body)
-				);
-		});
-
-		const requiredFields = ['title', 'url', 'description', 'rating'];
-
-		requiredFields.forEach((field) => {
-			const newBookmark = {
-				title: 'new title',
-				url: 'https://www.newaddress.com',
-				description: 'test new description',
-				rating: '5',
+				title: "test-title",
+				url: "https://test.com",
+				rating: 2,
+				description: "test description",
 			};
 
-			it(`responds with 400 and an error message when the '${field}' is missing`, () => {
+			it(`responds with 400 missing '${field}' if not supplied`, () => {
 				delete newBookmark[field];
 
 				return supertest(app)
-					.post('/bookmarks')
-					.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
+					.post(`/api/bookmarks`)
 					.send(newBookmark)
+					.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
 					.expect(400, {
 						error: {
 							message: `Missing '${field}' in request body`,
@@ -155,180 +122,119 @@ describe('Bookmarks Endpoints', () => {
 			});
 		});
 
-		context(`Given an XSS attack bookmark`, () => {
-			const {
-				maliciousBookmark,
-				expectedBookmark
-			} = fixtures.makeMaliciousBookmark()
-
-			beforeEach('insert malicious bookmark', () => {
-				return db
-					.into('bookmarks')
-					.insert([maliciousBookmark])
-			})
-
-			it('removes XSS attack content', () => {
-				return supertest(app)
-					.get(`/bookmarks/${maliciousBookmark.id}`)
-					.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-					.expect(200)
-					.expect(res => {
-						expect(res.body.title).to.eql(expectedBookmark.title)
-						expect(res.body.description).to.eql(expectedBookmark.description)
-					})
-			})
+		it(`responds with 400 invalid 'rating' if not between 0 and 5`, () => {
+			const newBookmarkInvalidRating = {
+				title: "test-title",
+				url: "https://test.com",
+				rating: "invalid",
+				description: "test description",
+			};
+			return supertest(app)
+				.post(`/api/bookmarks`)
+				.send(newBookmarkInvalidRating)
+				.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
+				.expect(400, {
+					error: {
+						message: `Rating must be a number between 0 and 5`,
+					},
+				});
 		});
-	})
 
-	describe('GET /bookmarks/:id', () => {
+		it(`responds with 400 invalid 'url' if not a valid URL`, () => {
+			const newBookmarkInvalidUrl = {
+				title: "test-title",
+				url: "htp://invalid-url",
+				rating: 1,
+				description: "test description",
+			};
+			return supertest(app)
+				.post(`/api/bookmarks`)
+				.send(newBookmarkInvalidUrl)
+				.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
+				.expect(400, {
+					error: {
+						message: `invalid url supplied`,
+					},
+				});
+		});
+
+		it("adds a new bookmark to the store", () => {
+			const newBookmark = {
+				title: "test-title",
+				url: "https://test.com",
+				description: "test description",
+				rating: 1,
+			};
+			return supertest(app)
+				.post(`/api/bookmarks`)
+				.send(newBookmark)
+				.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
+				.expect(201)
+				.expect((res) => {
+					expect(res.body.title).to.eql(newBookmark.title);
+					expect(res.body.url).to.eql(newBookmark.url);
+					expect(res.body.description).to.eql(newBookmark.description);
+					expect(parseInt(res.body.rating)).to.eql(newBookmark.rating);
+					expect(res.body).to.have.property("id");
+					expect(res.headers.location).to.eql(`/api/bookmarks/${res.body.id}`);
+				})
+				.then((res) =>
+					supertest(app)
+						.get(`/api/bookmarks/${res.body.id}`)
+						.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
+						.expect(res.body)
+				);
+		});
+
+		context(`Given an XSS attack bookmark`, () => {
+			const { maliciousBookmark, expectedBookmark } = fixtures.makeMaliciousBookmark();
+
+			beforeEach("insert malicious bookmark", () => {
+				return db.into("bookmarks").insert([maliciousBookmark]);
+			});
+
+			it("removes XSS attack content", () => {
+				return supertest(app)
+					.get(`/api/bookmarks/${maliciousBookmark.id}`)
+					.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
+					.expect(200)
+					.expect((res) => {
+						expect(res.body.title).to.eql(expectedBookmark.title);
+						expect(res.body.description).to.eql(expectedBookmark.description);
+					});
+			});
+		});
+	});
+
+	describe("GET /api/bookmarks/:id", () => {
 		context(`Given no bookmarks`, () => {
 			it(`responds 404 when bookmark doesn't exist`, () => {
 				return supertest(app)
-					.get(`/bookmarks/123`)
-					.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
+					.get(`/api/bookmarks/123`)
+					.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
 					.expect(404, {
 						error: {
-							message: `Bookmark doesn't exist`
+							message: `Bookmark doesn't exist`,
 						},
 					});
 			});
 		});
 
-		context('Given there are bookmarks in the database', () => {
+		context("Given there are bookmarks in the database", () => {
 			const testBookmarks = fixtures.makeBookmarksArray();
 
-			beforeEach('insert bookmarks', () => {
-				return db.into('bookmarks').insert(testBookmarks);
+			beforeEach("insert bookmarks", () => {
+				return db.into("bookmarks").insert(testBookmarks);
 			});
 
-			it('responds with 200 and the specified bookmark', () => {
+			it("responds with 200 and the specified bookmark", () => {
 				const bookmarkId = 2;
 				const expectedBookmark = testBookmarks[bookmarkId - 1];
 				return supertest(app)
-					.get(`/bookmarks/${bookmarkId}`)
-					.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
+					.get(`/api/bookmarks/${bookmarkId}`)
+					.set("Authorization", `Bearer ${process.env.API_TOKEN}`)
 					.expect(200, expectedBookmark);
 			});
 		});
 	});
-
-	// // TODO: update to use db, check why failing???
-	// describe('DELETE /bookmarks/:id', () => {
-	// 	it('removes the bookmark by ID from the store', () => {
-	// 		const secondBookmark = store.bookmarks[1];
-	// 		const expectedBookmarks = store.bookmarks.filter(
-	// 			(s) => s.id !== secondBookmark.id
-	// 		);
-	// 		return supertest(app)
-	// 			.delete(`/bookmarks/${secondBookmark.id}`)
-	// 			.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-	// 			.expect(204)
-	// 			.then(() => {
-	// 				expect(store.bookmarks).to.eql(expectedBookmarks);
-	// 			});
-	// 	});
-
-	// 	it(`returns 404 whe bookmark doesn't exist`, () => {
-	// 		return supertest(app)
-	// 			.delete(`/bookmarks/doesnt-exist`)
-	// 			.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-	// 			.expect(404, 'Bookmark Not Found');
-	// 	});
-	// });
-
-	// // TODO: update to use db???
-	// describe('POST /bookmarks', () => {
-	// 	it(`responds with 400 missing 'title' if not supplied`, () => {
-	// 		const newBookmarkMissingTitle = {
-	// 			// title: 'test-title',
-	// 			url: 'https://test.com',
-	// 			rating: 1,
-	// 		};
-	// 		return supertest(app)
-	// 			.post(`/bookmarks`)
-	// 			.send(newBookmarkMissingTitle)
-	// 			.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-	// 			.expect(400, `'title' is required`);
-	// 	});
-
-	// 	it(`responds with 400 missing 'url' if not supplied`, () => {
-	// 		const newBookmarkMissingUrl = {
-	// 			title: 'test-title',
-	// 			// url: 'https://test.com',
-	// 			rating: 1,
-	// 		};
-	// 		return supertest(app)
-	// 			.post(`/bookmarks`)
-	// 			.send(newBookmarkMissingUrl)
-	// 			.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-	// 			.expect(400, `'url' is required`);
-	// 	});
-
-	// 	it(`responds with 400 missing 'rating' if not supplied`, () => {
-	// 		const newBookmarkMissingRating = {
-	// 			title: 'test-title',
-	// 			url: 'https://test.com',
-	// 			// rating: 1,
-	// 		};
-	// 		return supertest(app)
-	// 			.post(`/bookmarks`)
-	// 			.send(newBookmarkMissingRating)
-	// 			.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-	// 			.expect(400, `'rating' is required`);
-	// 	});
-
-	// 	it(`responds with 400 invalid 'rating' if not between 0 and 5`, () => {
-	// 		const newBookmarkInvalidRating = {
-	// 			title: 'test-title',
-	// 			url: 'https://test.com',
-	// 			rating: 'invalid',
-	// 		};
-	// 		return supertest(app)
-	// 			.post(`/bookmarks`)
-	// 			.send(newBookmarkInvalidRating)
-	// 			.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-	// 			.expect(400, `'rating' must be a number between 0 and 5`);
-	// 	});
-
-	// 	it(`responds with 400 invalid 'url' if not a valid URL`, () => {
-	// 		const newBookmarkInvalidUrl = {
-	// 			title: 'test-title',
-	// 			url: 'htp://invalid-url',
-	// 			rating: 1,
-	// 		};
-	// 		return supertest(app)
-	// 			.post(`/bookmarks`)
-	// 			.send(newBookmarkInvalidUrl)
-	// 			.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-	// 			.expect(400, `'url' must be a valid URL`);
-	// 	});
-
-	// 	it('adds a new bookmark to the store', () => {
-	// 		const newBookmark = {
-	// 			title: 'test-title',
-	// 			url: 'https://test.com',
-	// 			description: 'test description',
-	// 			rating: 1,
-	// 		};
-	// 		return supertest(app)
-	// 			.post(`/bookmarks`)
-	// 			.send(newBookmark)
-	// 			.set('Authorization', `Bearer ${process.env.API_TOKEN}`)
-	// 			.expect(201)
-	// 			.expect((res) => {
-	// 				expect(res.body.title).to.eql(newBookmark.title);
-	// 				expect(res.body.url).to.eql(newBookmark.url);
-	// 				expect(res.body.description).to.eql(
-	// 					newBookmark.description
-	// 				);
-	// 				expect(res.body.rating).to.eql(newBookmark.rating);
-	// 				expect(res.body.id).to.be.a('string');
-	// 			})
-	// 			.then((res) => {
-	// 				expect(store.bookmarks[store.bookmarks.length - 1]).to.eql(
-	// 					res.body
-	// 				);
-	// 			});
-	// 	});
-	// });
 });

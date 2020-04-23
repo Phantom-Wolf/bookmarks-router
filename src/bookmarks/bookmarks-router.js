@@ -1,22 +1,17 @@
 // imports
 
 const express = require("express");
-const {
-	v4: uuidv4
-} = require("uuid");
-const {
-	isWebUri
-} = require("valid-url");
+const { v4: uuidv4 } = require("uuid");
+const { isWebUri } = require("valid-url");
 const logger = require("../logger");
 const xss = require("xss");
-const {
-	bookmarks
-} = require("../store");
+const { bookmarks } = require("../store");
 const BookmarksService = require("./bookmarks-service");
+const path = require("path");
 
 // middleware
 
-const bookmarkRouter = express.Router();
+const bookmarksRouter = express.Router();
 const jsonParser = express.json();
 
 const serializeBookmark = (bookmark) => ({
@@ -29,7 +24,7 @@ const serializeBookmark = (bookmark) => ({
 
 // body
 
-bookmarkRouter
+bookmarksRouter
 	.route("/")
 	.get((req, res, next) => {
 		const knexInstance = req.app.get("db");
@@ -40,20 +35,15 @@ bookmarkRouter
 			.catch(next);
 	})
 	.post(jsonParser, (req, res, next) => {
-		const {
-			title,
-			url,
-			description,
-			rating
-		} = req.body;
+		const { title, url, description, rating } = req.body;
 		const newBookmark = {
 			title,
 			url,
 			description,
-			rating
+			rating,
 		};
 
-		for (const [key, value] of Object.entries(newArticle))
+		for (const [key, value] of Object.entries(newBookmark))
 			if (value == null)
 				return res.status(400).json({
 					error: {
@@ -78,15 +68,19 @@ bookmarkRouter
 				},
 			});
 		}
-
+		console.log(newBookmark, "preservice bookmark body");
 		BookmarksService.insertBookmark(req.app.get("db"), newBookmark)
 			.then((bookmark) => {
-				res.status(201).location(`/bookmarks/${bookmark.id}`).json(serializeBookmark(bookmark));
+				console.log(bookmark, "bookmark promise body");
+				res
+					.status(201)
+					.location(path.posix.join(req.originalUrl, `${bookmark.id}`))
+					.json(serializeBookmark(bookmark));
 			})
 			.catch(next);
 	});
 
-bookmarkRouter
+bookmarksRouter
 	.route("/:bookmark_id")
 	.all((req, res, next) => {
 		const knexInstance = req.app.get("db");
@@ -110,6 +104,30 @@ bookmarkRouter
 	.delete((req, res, next) => {
 		ArticlesService.deleteArticle(req.app.get("db"), req.params.article_id)
 			.then(() => {
+				res.status(204).end();
+			})
+			.catch(next);
+	})
+	.patch(jsonParser, (req, res, next) => {
+		const { title, url, description, rating } = req.body;
+		const bookmarkToUpdate = {
+			title,
+			url,
+			description,
+			rating,
+		};
+
+		const numberOfValues = Object.values(bookmarkToUpdate).filter(Boolean).length;
+		if (numberOfValues === 0) {
+			return res.status(400).json({
+				error: {
+					message: `Request body must contain either 'title', 'url', 'description' or 'rating'`,
+				},
+			});
+		}
+
+		BookmarksService.updateBookmark(req.app.get("db"), req.params.bookmark_id, bookmarkToUpdate)
+			.then((numRowsAffected) => {
 				res.status(204).end();
 			})
 			.catch(next);
